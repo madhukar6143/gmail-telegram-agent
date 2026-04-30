@@ -31,14 +31,24 @@ def gmail_webhook():
             print(f"New email notification: {decoded}")
 
         # Trigger Claude Code Routine
+        # response = requests.post(
+        #     f"https://api.claude.ai/api/coding_assistants/routines/{ROUTINE_ID}/trigger",
+        #     headers={
+        #         "Authorization": f"Bearer {CLAUDE_API_KEY}",
+        #         "Content-Type": "application/json"
+        #     },
+        #     json={"source": "gmail_webhook"}
+        # )
+
         response = requests.post(
-            f"https://api.claude.ai/api/coding_assistants/routines/{ROUTINE_ID}/trigger",
-            headers={
-                "Authorization": f"Bearer {CLAUDE_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={"source": "gmail_webhook"}
-        )
+    f"https://api.anthropic.com/v1/routines/{ROUTINE_ID}/trigger",
+    headers={
+        "x-api-key": CLAUDE_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json"
+    },
+    json={"source": "gmail_webhook"}
+)
         
         print(f"Claude triggered: {response.status_code}")
         return "OK", 200

@@ -5,7 +5,7 @@ import base64
 
 app = Flask(__name__)
 
-CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY")
+ROUTINE_TOKEN = os.environ.get("ROUTINE_TOKEN")
 ROUTINE_ID = os.environ.get("ROUTINE_ID")
 
 @app.route("/", methods=["GET"])
@@ -27,13 +27,14 @@ def gmail_webhook():
             print(f"New email notification: {decoded}")
 
         response = requests.post(
-            f"https://api.anthropic.com/v1/routines/{ROUTINE_ID}/trigger",
+            f"https://api.anthropic.com/v1/claude_code/routines/{ROUTINE_ID}/fire",
             headers={
-                "x-api-key": CLAUDE_API_KEY,
+                "Authorization": f"Bearer {ROUTINE_TOKEN}",
+                "anthropic-beta": "experimental-cc-routine-2026-04-01",
                 "anthropic-version": "2023-06-01",
                 "Content-Type": "application/json"
             },
-            json={"source": "gmail_webhook"}
+            json={"text": "New email arrived in Gmail inbox"}
         )
         
         print(f"Claude triggered: {response.status_code}")
@@ -45,4 +46,4 @@ def gmail_webhook():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    a

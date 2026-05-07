@@ -2,11 +2,16 @@ from flask import Flask, request
 import requests
 import os
 import base64
+import time
 
 app = Flask(__name__)
 
 ROUTINE_TOKEN = os.environ.get("ROUTINE_TOKEN")
 ROUTINE_ID = os.environ.get("ROUTINE_ID")
+
+# Cooldown tracker
+last_triggered = 0
+COOLDOWN_SECONDS = 300  # 5 minutes
 
 @app.route("/", methods=["GET"])
 def home():
@@ -14,6 +19,7 @@ def home():
 
 @app.route("/gmail-webhook", methods=["POST"])
 def gmail_webhook():
+    global last_triggered
     try:
         envelope = request.get_json()
         if not envelope:
@@ -26,6 +32,14 @@ def gmail_webhook():
             decoded = base64.b64decode(data).decode("utf-8")
             print(f"New email notification: {decoded}")
 
+        # Check cooldown
+        now = time.time()
+        if now - last_triggered < COOLDOWN_SECONDS:
+            remaining = int(COOLDOWN_SECONDS - (now - last_triggered))
+            print(f"Cooldown active — skipping trigger ({remaining}s remaining)")
+            return "OK", 200
+
+        # Trigger Claude
         response = requests.post(
             f"https://api.anthropic.com/v1/claude_code/routines/{ROUTINE_ID}/fire",
             headers={
@@ -37,7 +51,12 @@ def gmail_webhook():
             json={"text": "New email arrived in Gmail inbox"}
         )
         
-        print(f"Claude triggered: {response.status_code}")
+        if response.status_code == 200:
+            last_triggered = now
+            print(f"Claude triggered successfully: {response.status_code}")
+        else:
+            print(f"Claude trigger failed: {response.status_code}")
+            
         return "OK", 200
 
     except Exception as e:
@@ -46,4 +65,4 @@ def gmail_webhook():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    a
+    app.run(host="0.0.0.0", port=port)

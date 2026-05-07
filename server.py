@@ -2,16 +2,12 @@ from flask import Flask, request
 import requests
 import os
 import base64
-import time
+import json
 
 app = Flask(__name__)
 
 ROUTINE_TOKEN = os.environ.get("ROUTINE_TOKEN")
 ROUTINE_ID = os.environ.get("ROUTINE_ID")
-
-# Cooldown tracker
-last_triggered = 0
-COOLDOWN_SECONDS = 300  # 5 minutes
 
 @app.route("/", methods=["GET"])
 def home():
@@ -19,7 +15,6 @@ def home():
 
 @app.route("/gmail-webhook", methods=["POST"])
 def gmail_webhook():
-    global last_triggered
     try:
         envelope = request.get_json()
         if not envelope:
@@ -27,19 +22,18 @@ def gmail_webhook():
 
         pubsub_message = envelope.get("message", {})
         data = pubsub_message.get("data", "")
-        
+        history_id = "unknown"
+
         if data:
             decoded = base64.b64decode(data).decode("utf-8")
             print(f"New email notification: {decoded}")
+            try:
+                parsed = json.loads(decoded)
+                history_id = parsed.get("historyId", "unknown")
+            except:
+                pass
 
-        # Check cooldown
-        now = time.time()
-        if now - last_triggered < COOLDOWN_SECONDS:
-            remaining = int(COOLDOWN_SECONDS - (now - last_triggered))
-            print(f"Cooldown active — skipping trigger ({remaining}s remaining)")
-            return "OK", 200
-
-        # Trigger Claude
+        # Trigger Claude immediately — no cooldown
         response = requests.post(
             f"https://api.anthropic.com/v1/claude_code/routines/{ROUTINE_ID}/fire",
             headers={
@@ -48,15 +42,10 @@ def gmail_webhook():
                 "anthropic-version": "2023-06-01",
                 "Content-Type": "application/json"
             },
-            json={"text": "New email arrived in Gmail inbox"}
+            json={"text": f"New email arrived. historyId: {history_id}. Process only this specific email."}
         )
-        
-        if response.status_code == 200:
-            last_triggered = now
-            print(f"Claude triggered successfully: {response.status_code}")
-        else:
-            print(f"Claude trigger failed: {response.status_code}")
-            
+
+        print(f"Claude triggered: {response.status_code}")
         return "OK", 200
 
     except Exception as e:
